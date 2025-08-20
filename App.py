@@ -10,10 +10,10 @@ from sklearn.metrics import accuracy_score, confusion_matrix, ConfusionMatrixDis
 # =============================
 # Configuración general
 # =============================
-st.set_page_config(page_title="Árbol de Decisión - ML App", layout="wide")
+st.set_page_config(page_title="Árbol de Decisión - Clasificación de Cultivos", layout="wide")
 
 # =============================
-# Generar dataset simulado
+# Generar dataset simulado (si no se sube CSV)
 # =============================
 @st.cache_data
 def generar_datos(n_samples=400, n_features=6, random_state=42):
@@ -35,9 +35,9 @@ def generar_datos(n_samples=400, n_features=6, random_state=42):
 # =============================
 st.sidebar.header("⚙️ Parámetros del modelo")
 
-# Parámetros del dataset
-n_samples = st.sidebar.slider("Número de muestras", 200, 1000, 400, step=50)
-n_features = st.sidebar.slider("Número de características", 6, 12, 6)
+# Parámetros del dataset simulado
+n_samples = st.sidebar.slider("Número de muestras (simulado)", 200, 1000, 400, step=50)
+n_features = st.sidebar.slider("Número de características (simulado)", 6, 12, 6)
 test_size = st.sidebar.slider("Proporción de prueba", 0.1, 0.5, 0.3, step=0.05)
 
 # Parámetros del árbol de decisión
@@ -49,9 +49,9 @@ min_samples_leaf = st.sidebar.slider("Mínimo de muestras en hoja", 1, 20, 1)
 # =============================
 # Cargar dataset o generar
 # =============================
-st.title("🌳 Clasificación con Árbol de Decisión")
+st.title("🌽🌾🥔 Clasificación de Cultivos con Árbol de Decisión")
 
-uploaded_file = st.file_uploader("Sube un archivo CSV (debe contener la columna 'target')", type="csv")
+uploaded_file = st.file_uploader("Sube un archivo CSV (ej: con columna 'cultivo')", type="csv")
 
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
@@ -64,14 +64,20 @@ st.subheader("📊 Vista previa del dataset")
 st.write(df.head())
 
 # =============================
-# División de datos
+# Selección de la variable objetivo
 # =============================
-if "target" not in df.columns:
-    st.error("❌ El dataset debe contener una columna llamada 'target'")
-else:
-    X = df.drop("target", axis=1)
-    y = df["target"]
+columnas = df.columns.tolist()
+target_col = st.selectbox("Selecciona la columna objetivo (ej: 'cultivo')", columnas, index=len(columnas)-1)
 
+if target_col not in df.columns:
+    st.error("❌ No se encontró la columna objetivo seleccionada.")
+else:
+    X = df.drop(target_col, axis=1)
+    y = df[target_col]
+
+    # =============================
+    # División de datos
+    # =============================
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=42
     )
@@ -106,25 +112,26 @@ else:
     # Matriz de confusión
     # =============================
     st.subheader("📌 Matriz de Confusión")
-    cm = confusion_matrix(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred, labels=np.unique(y))
     fig, ax = plt.subplots()
-    ConfusionMatrixDisplay(cm).plot(ax=ax, cmap="Blues", colorbar=False)
+    ConfusionMatrixDisplay(cm, display_labels=np.unique(y)).plot(ax=ax, cmap="Blues", colorbar=False)
     st.pyplot(fig)
 
     # =============================
-    # Visualización de dispersión
+    # Visualización de dispersión (siempre que haya al menos 2 features numéricas)
     # =============================
-    st.subheader("🌐 Visualización de Clases (2 primeras características)")
-    fig, ax = plt.subplots()
-    scatter = ax.scatter(
-        X_test.iloc[:, 0], X_test.iloc[:, 1],
-        c=y_pred, cmap="viridis", alpha=0.7, edgecolors="k"
-    )
-    legend1 = ax.legend(*scatter.legend_elements(), title="Clases")
-    ax.add_artist(legend1)
-    plt.xlabel("Feature 0")
-    plt.ylabel("Feature 1")
-    st.pyplot(fig)
+    if X.shape[1] >= 2:
+        st.subheader("🌐 Visualización de Clases (2 primeras características)")
+        fig, ax = plt.subplots()
+        scatter = ax.scatter(
+            X_test.iloc[:, 0], X_test.iloc[:, 1],
+            c=pd.Categorical(y_pred).codes, cmap="viridis", alpha=0.7, edgecolors="k"
+        )
+        legend1 = ax.legend(*scatter.legend_elements(), title="Clases")
+        ax.add_artist(legend1)
+        plt.xlabel(X.columns[0])
+        plt.ylabel(X.columns[1])
+        st.pyplot(fig)
 
     # =============================
     # Visualización del Árbol
